@@ -4,3 +4,4 @@ torch
 gymnasium
 jupyter
 tqdm
+stable-baselines3
