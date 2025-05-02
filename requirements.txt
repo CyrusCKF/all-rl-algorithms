@@ -5,3 +5,6 @@ gymnasium
 jupyter
 tqdm
 stable-baselines3
+ray[rllib]
+godot-rl
+pyinstaller
