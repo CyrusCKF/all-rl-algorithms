@@ -4,7 +4,5 @@ torch
 gymnasium
 jupyter
 tqdm
-stable-baselines3
-ray[rllib]
-godot-rl
+godot-rl[clean-rl]
 pyinstaller

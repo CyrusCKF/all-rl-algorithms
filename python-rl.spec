@@ -2,11 +2,11 @@
 
 
 a = Analysis(
-    ['godot-sb3.py'],
+    ['godot-cleanrl.py'],
     pathex=[],
     binaries=[],
     datas=[],
-    hiddenimports=['stable_baselines3'],
+    hiddenimports=[],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -26,7 +26,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=False,
+    console=True,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
