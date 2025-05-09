@@ -220,6 +220,8 @@ if __name__ == "__main__":
             actions[step] = action
             logprobs[step] = logprob
 
+            # print("Action:", action, logprob)
+
             # TRY NOT TO MODIFY: execute the game and log data.
             next_obs, reward, terminated, truncated, infos = envs.step(action.cpu().numpy())
             done = np.logical_or(terminated, truncated)
