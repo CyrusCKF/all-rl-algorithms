@@ -19,6 +19,8 @@ from torch.distributions.normal import Normal
 
 from godot_rl.wrappers.clean_rl_wrapper import CleanRLGodotEnv
 
+from rl_server.socket_connection import SocketConnection
+
 logger = logging.getLogger(__name__)
 
 
@@ -179,6 +181,12 @@ def main():
     logging.basicConfig(level=logging.DEBUG)
     args = parse_args()
     logger.info(f"Commands: {args}")
+    client_connection = SocketConnection(port=11010)
+    client_connection.send("Python backend hello")
+    # event = client_connection.receive()
+    # print("Client event", event)
+    # if event == "close":
+    #     return
 
     set_seed(args.seed)
     if args.cuda and not torch.cuda.is_available():
@@ -375,6 +383,7 @@ def main():
             "losses/clipfrac": np.mean(clipfracs),
             "losses/explained_variance": explained_var,
         }
+        client_connection.send(str(metrics))
         logger.debug(f"Step {global_step}| Metrics\n{metrics}")
         if len(episode_returns) > 0:
             steps_per_second = int(global_step / (time.time() - start_time))
