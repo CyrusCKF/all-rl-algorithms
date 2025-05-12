@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['godot-cleanrl.py'],
+    ['godot-cleanrl-clean.py'],
     pathex=[],
     binaries=[],
     datas=[],

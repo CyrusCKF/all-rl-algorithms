@@ -1,1 +1,1 @@
-pyinstaller .\godot-cleanrl.py -n python-rl
+pyinstaller .\godot-cleanrl-clean.py -n python-rl

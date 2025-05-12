@@ -20,6 +20,7 @@ from torch.distributions.normal import Normal
 from godot_rl.wrappers.clean_rl_wrapper import CleanRLGodotEnv
 
 from rl_server.socket_connection import SocketConnection
+from rl_server.state_stack import StateStack
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +55,7 @@ def parse_args():
                         help="the path of the environment")
     parser.add_argument("--speedup", type=int, default=8,
                         help="the speedup of the godot environment")
-    parser.add_argument("--total-timesteps", type=int, default=1000000,
+    parser.add_argument("--total-timesteps", type=int, default=10000,
                         help="total timesteps of the experiments")
     parser.add_argument("--learning-rate", type=float, default=3e-4,
                         help="the learning rate of the optimizer")
@@ -100,6 +101,7 @@ class Agent(nn.Module):
         out_features = np.prod(envs.single_action_space.shape).item()
 
         self.critic = nn.Sequential(
+            nn.Flatten(),
             nn.Linear(in_features, 64),
             nn.Tanh(),
             nn.Linear(64, 64),
@@ -107,6 +109,7 @@ class Agent(nn.Module):
             nn.Linear(64, 1),
         )
         self.actor_mean = nn.Sequential(
+            nn.Flatten(),
             nn.Linear(in_features, 64),
             nn.Tanh(),
             nn.Linear(64, 64),
@@ -178,15 +181,15 @@ def export_agent(agent: Agent, file: pathlib.Path, sample_obs):
 
 
 def main():
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(
+        level=logging.DEBUG,
+        handlers=[logging.StreamHandler(), logging.FileHandler("train.log")],
+    )
+
     args = parse_args()
     logger.info(f"Commands: {args}")
     client_connection = SocketConnection(port=11010)
     client_connection.send("Python backend hello")
-    # event = client_connection.receive()
-    # print("Client event", event)
-    # if event == "close":
-    #     return
 
     set_seed(args.seed)
     if args.cuda and not torch.cuda.is_available():
@@ -201,10 +204,12 @@ def main():
         seed=args.seed if args.seed is not None else 1,
         n_parallel=args.n_parallel,
     )
+    envs = StateStack(envs, 2)
+    
     num_envs = envs.num_envs
     batch_size = int(num_envs * args.num_steps)
     minibatch_size = int(batch_size // args.num_minibatches)
-    logging.info(f"Env: {num_envs=}, {batch_size=} {minibatch_size=}")
+    logging.info(f"Env: {num_envs=}, {batch_size=} {minibatch_size=} obs_space={envs.single_observation_space} action_space={envs.single_action_space}")
 
     agent = Agent(envs).to(device)
     optimizer = optim.Adam(agent.parameters(), lr=args.learning_rate, eps=1e-5)
@@ -226,6 +231,7 @@ def main():
     global_step = 0
     start_time = time.time()
     next_obs, _ = envs.reset(seed=args.seed)
+    logger.info(f"OBS shape={next_obs.shape}")
     next_obs = torch.tensor(next_obs, dtype=torch.float).to(device)
     next_done = torch.zeros(num_envs).to(device)
     num_updates = args.total_timesteps // batch_size
@@ -389,6 +395,11 @@ def main():
             steps_per_second = int(global_step / (time.time() - start_time))
             mean_return = np.mean(np.array(episode_returns)).item()
             logging.info(f"SPS: {steps_per_second}| Returns: {mean_return}")
+
+        event = client_connection.receive()
+        print("Client event", event)
+        if event == "close":
+            break
 
     envs.close()
 

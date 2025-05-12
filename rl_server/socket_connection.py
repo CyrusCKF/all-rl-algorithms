@@ -1,6 +1,6 @@
 import logging
-from select import select
 import socket
+from select import select
 
 logger = logging.getLogger(__name__)
 
@@ -13,12 +13,19 @@ class SocketConnection:
 
         sock.bind((address, port))
         sock.listen(0)
-        sock.settimeout(60)
-        self.connection, self.client_address = sock.accept()
-        logger.info("connection established")
+        sock.settimeout(5)
+        try:
+            self.connection, self.client_address = sock.accept()
+            logger.info("connection established")
+        except TimeoutError:
+            self.connection = None
+            logger.info("connection time out")
 
     def receive(self) -> str | None:
         """Receive data in a non-blocking way. Return None if no available bytes"""
+        if self.connection is None:
+            return None
+
         readable, writable, exceptional = select([self.connection], [], [], 0.01)
         if not readable:
             return None
@@ -29,5 +36,7 @@ class SocketConnection:
         return data.decode()
 
     def send(self, text: str):
+        if self.connection is None:
+            return
         message = len(text).to_bytes(4, "little") + bytes(text.encode())
         self.connection.sendall(message)
