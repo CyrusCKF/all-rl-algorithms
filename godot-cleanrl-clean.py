@@ -7,18 +7,18 @@ import os
 import pathlib
 import random
 import time
+import warnings
 from collections import deque
 from distutils.util import strtobool
-import warnings
 
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from godot_rl.wrappers.clean_rl_wrapper import CleanRLGodotEnv
 from torch.distributions.normal import Normal
 
-from godot_rl.wrappers.clean_rl_wrapper import CleanRLGodotEnv
-
+from rl_server.agent import Agent
 from rl_server.socket_connection import SocketConnection
 from rl_server.state_stack import StateStack
 
@@ -55,7 +55,7 @@ def parse_args():
                         help="the path of the environment")
     parser.add_argument("--speedup", type=int, default=8,
                         help="the speedup of the godot environment")
-    parser.add_argument("--total-timesteps", type=int, default=10000,
+    parser.add_argument("--total-timesteps", type=int, default=100000,
                         help="total timesteps of the experiments")
     parser.add_argument("--learning-rate", type=float, default=3e-4,
                         help="the learning rate of the optimizer")
@@ -91,49 +91,6 @@ def parse_args():
 
     # fmt: on
     return args
-
-
-class Agent(nn.Module):
-    def __init__(self, envs: CleanRLGodotEnv):
-        super().__init__()
-        in_features = np.prod(envs.single_observation_space.shape).item()
-        assert envs.single_action_space.shape is not None
-        out_features = np.prod(envs.single_action_space.shape).item()
-
-        self.critic = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(in_features, 64),
-            nn.Tanh(),
-            nn.Linear(64, 64),
-            nn.Tanh(),
-            nn.Linear(64, 1),
-        )
-        self.actor_mean = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(in_features, 64),
-            nn.Tanh(),
-            nn.Linear(64, 64),
-            nn.Tanh(),
-            nn.Linear(64, out_features),
-        )
-        self.actor_logstd = nn.Parameter(torch.zeros(1, out_features))
-
-    def get_value(self, x):
-        return self.critic(x)
-
-    def get_action_and_value(self, x, action=None):
-        action_mean = self.actor_mean(x)
-        action_logstd = self.actor_logstd.expand_as(action_mean)
-        action_std = torch.exp(action_logstd)
-        probs = Normal(action_mean, action_std)
-        if action is None:
-            action = probs.sample()
-        return (
-            action,
-            probs.log_prob(action).sum(1),
-            probs.entropy().sum(1),
-            self.critic(x),
-        )
 
 
 def set_seed(seed: int | None):
@@ -204,14 +161,20 @@ def main():
         seed=args.seed if args.seed is not None else 1,
         n_parallel=args.n_parallel,
     )
-    envs = StateStack(envs, 2)
-    
+    envs = StateStack(envs, 1)
+
     num_envs = envs.num_envs
     batch_size = int(num_envs * args.num_steps)
     minibatch_size = int(batch_size // args.num_minibatches)
-    logging.info(f"Env: {num_envs=}, {batch_size=} {minibatch_size=} obs_space={envs.single_observation_space} action_space={envs.single_action_space}")
+    logging.info(
+        f"Env: {num_envs=}, {batch_size=} {minibatch_size=} obs_space={envs.single_observation_space} action_space={envs.single_action_space}"
+    )
 
-    agent = Agent(envs).to(device)
+    agent = Agent(envs, 4, 6).to(device)
+    num_params = 0
+    for param in agent.parameters():
+        num_params += param.numel()
+    logger.info(f"Number of parameters: {num_params}")
     optimizer = optim.Adam(agent.parameters(), lr=args.learning_rate, eps=1e-5)
 
     # ALGO Logic: Storage setup

@@ -5,10 +5,13 @@ from godot_rl.wrappers.clean_rl_wrapper import CleanRLGodotEnv
 from gymnasium.spaces import Box
 
 
-class StateStack:
+class StateStack(CleanRLGodotEnv):
     """Wrapper of :class:`CleanRLGodotEnv`. Support stacking multiple states as observation.
 
     Return observation of shape (num_envs, num_stacks, *single_obs_shape)
+
+    Note that this class implements the CleanRLGodotEnv interface, while not being the 
+    actual "sub-class"
     """
 
     def __init__(self, env: CleanRLGodotEnv, num_stacks: int, every_n: int = 1):
@@ -26,12 +29,14 @@ class StateStack:
         self.states = deque(maxlen=queue_len)
 
     def reset(self, seed):
+        """Return observation of shape (num_envs, num_stacks, *single_obs_shape)"""
         obs, info = self.env.reset(seed=seed)
         for _ in range(self.queue_len):
             self.states.append(obs)
         return self._get_observation(), info
 
     def step(self, action):
+        """Return observation of shape (num_envs, num_stacks, *single_obs_shape)"""
         obs, reward, terminated, truncated, info = self.env.step(action)
         self.states.append(obs)
         return self._get_observation(), reward, terminated, truncated, info
