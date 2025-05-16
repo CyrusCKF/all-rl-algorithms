@@ -16,7 +16,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from godot_rl.wrappers.clean_rl_wrapper import CleanRLGodotEnv
-from torch.distributions.normal import Normal
 
 from rl_server.agent import Agent
 from rl_server.socket_connection import SocketConnection
@@ -160,6 +159,7 @@ def main():
         speedup=args.speedup,
         seed=args.seed if args.seed is not None else 1,
         n_parallel=args.n_parallel,
+        custom_arg="custom param"
     )
     envs = StateStack(envs, 1)
 
@@ -170,7 +170,7 @@ def main():
         f"Env: {num_envs=}, {batch_size=} {minibatch_size=} obs_space={envs.single_observation_space} action_space={envs.single_action_space}"
     )
 
-    agent = Agent(envs, 4, 6).to(device)
+    agent = Agent(envs, 3, 8).to(device)
     num_params = 0
     for param in agent.parameters():
         num_params += param.numel()
